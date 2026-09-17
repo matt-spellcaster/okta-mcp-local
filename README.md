@@ -1,97 +1,108 @@
 # okta-mcp-local
 
-A small wrapper script for running Okta's open source [okta-mcp-server](https://github.com/okta/okta-mcp-server)
-on macOS for Claude Code and Claude Desktop. It uses Private Key JWT auth, and the private key stays in 1Password.
+**Connecting an AI assistant to Okta, with the same controls as any other privileged integration.**
+
+AI assistants that can call admin APIs are a new kind of privileged access, and auditors will ask
+how they're governed. This repo runs Okta's open source
+[okta-mcp-server](https://github.com/okta/okta-mcp-server) for Claude Code and Claude Desktop on
+macOS. It treats the assistant like a service account: no secret on disk, least-privilege access,
+restricted network, a pinned supply chain, and a human approving each action.
+
+- **No shared secret:** Private Key JWT, with the key kept in 1Password and fetched only when the
+  server starts.
+- **Least privilege in two layers:** explicit API scopes, plus a custom admin role instead of
+  Super Administrator.
+- **Stolen credentials don't work elsewhere:** tokens are only issued to, and accepted from, an
+  allowlisted network.
+- **Pinned supply chain:** an exact server version, and dependencies frozen to a publish date.
+- **Leak prevention:** a pre-commit hook, git-ignored settings, and GitHub push protection.
 
 ## How it works
 
-`run.sh` loads non-secret settings from `env` (git-ignored). It gets the PEM private key with
-`op read`, passes it to the server as `OKTA_PRIVATE_KEY`, and starts the pinned server version with `uvx`.
-The key never lives in this repo or on disk.
+```
+Claude ──stdio──▶ run.sh ──op read──▶ 1Password (you approve)
+                    │
+                    └─▶ okta-mcp-server (pinned) ──signed JWT──▶ Okta
+                                                   (scopes + admin role + network zone)
+```
+
+`run.sh` loads non-secret settings from `env` (git-ignored), reads the PEM key from 1Password, and
+starts the pinned server with `uvx`. Claude talks to the server over stdin/stdout, so nothing
+listens on the network, and Claude's config contains only the path to `run.sh`.
+
+## Controls
+
+| Safeguard | Risk it addresses | SOC 2 | ISO 27001:2022 |
+|---|---|---|---|
+| Private Key JWT; key only in 1Password | Leaked client secret | CC6.1 | A.5.17 |
+| Explicit scopes and a custom admin role | Over-privileged assistant | CC6.3 | A.8.2 |
+| Network zone on token requests and token use | Stolen key or token used elsewhere | CC6.6 | A.8.20 |
+| Pinned server and frozen dependencies | Malicious or breaking upstream release | CC8.1 | A.8.19 |
+| Pre-commit hook, `.gitignore`, push protection | Secrets committed to git | CC6.1 | A.8.12 |
+| Human approval in Claude; confirmation for destructive tools | Unintended changes | CC6.1 | A.8.2 |
+| Okta system log of the app's admin actions | Unreviewed changes | CC7.2 | A.8.15 |
 
 ## Security design
 
-This setup assumes the machine or the repo could be exposed, and it limits what a leak could do.
+The setup assumes the machine or repo could be exposed, and limits what a leak could do.
 
-### Credentials
+**Credentials**
+- Okta keeps only the public key, so there's no client secret to leak.
+- The private key is never written to disk, stored in Claude's config, or committed. 1Password can
+  require approval each time the server starts.
+- Org URL, client ID, key ID and scopes are in `env`, which is git-ignored and owner-readable only.
 
-- **Key-based client authentication, no shared secret.** The Okta app uses Private Key JWT. Each
-  token request is signed with a private key, and Okta keeps only the public half. This setup has
-  no client secret to leak.
-- **The private key lives only in 1Password.** `run.sh` fetches it with `op read` each time the
-  server starts, and 1Password may ask for approval. The key is never written to disk, never stored
-  in Claude's config files, and never committed. Claude's config contains only the path to `run.sh`.
-- **Settings are kept apart from secrets.** Org URL, client ID, key ID and scopes are in `env`,
-  which is git-ignored and readable only by the owner (`chmod 600`). The repo contains only
-  `env.example` with placeholders.
+**Access in Okta**
+- The server requests only the scopes in `OKTA_SCOPES` and hides every tool whose scope is
+  missing, so the assistant only sees operations it can perform. The scopes *granted* to the app
+  in Okta should match that list. The companion
+  [okta-access-review](https://github.com/matt-spellcaster/okta-access-review) tool reports
+  service apps whose granted write scopes or admin roles go beyond that (check AR-10).
+- Okta allows a call only if both the token's scopes and the app's admin role permit it. The app
+  uses a custom role with only the permissions these tools need.
+- The server doesn't support DPoP, which would bind tokens to a client key. The network zone is the
+  compensating control: a stolen key or token is useless outside the allowlisted network.
 
-### Access control in Okta
+**Supply chain**
+- `run.sh` runs an exact release of `okta-mcp-server`, and `uvx --exclude-newer` ignores any package
+  published after a fixed date, so an upstream release can't change what runs without a reviewed
+  commit.
 
-- **Scopes are listed explicitly.** Only the scopes in `OKTA_SCOPES` are requested, and each must
-  be granted to the app in Okta. The server turns off every tool whose scope is missing, so Claude
-  only sees the operations it is allowed to perform.
-- **Least-privilege admin role.** What the app can do is limited by both its granted scopes and
-  its admin role. The app has a custom admin role that grants only the permissions these tools
-  need, instead of a built-in role like Super Admin.
-- **Network restriction.** The app accepts token requests, and use of its tokens, only from an
-  allowlisted network zone. A stolen key or access token is useless from any other network. This
-  was added mainly because the MCP server doesn't support DPoP, which would otherwise tie each
-  token to a client-held key. Without DPoP, the network restriction limits where a stolen token
-  can be used.
-- **Human in the loop.** The server asks for confirmation before destructive operations, and Claude
-  asks for approval before calling tools unless you tell it to always allow them.
+## Known risks
 
-### Supply chain
-
-- **Pinned server version.** `run.sh` runs an exact release of `okta-mcp-server`, not the latest.
-- **Frozen dependencies.** `uvx --exclude-newer` ignores any package published after a fixed date,
-  so a new upstream release, including a malicious one, can't change what runs without a
-  reviewed commit.
-
-### Leak prevention in the repo
-
-- **`.gitignore`** excludes `env`, key files (`*.pem`, `*.key`) and logs.
-- **Pre-commit hook** (`.githooks/pre-commit`) refuses any commit that stages `env`, a key file, or
-  text that looks like a private key.
-- **GitHub secret scanning and push protection** are turned on for the repository.
-
-### Known limitations
-
-- **Tokens are bearer tokens.** The server doesn't support DPoP, so access tokens aren't tied to a
-  client key. The network restriction (see above) and Okta's short token lifetime reduce this risk.
-- **The key is in memory while the server runs.** It is held in the server process's environment,
-  where other processes running as the same macOS user could read it.
-- **Okta data goes to the model.** Anything Claude reads through these tools, such as user profiles
-  or logs, becomes part of the conversation. Use a dev or test org, not production data.
+| Risk | Mitigation |
+|---|---|
+| Tokens are bearer tokens (no DPoP support upstream) | Network zone, short token lifetime |
+| The key is in the server's memory while it runs, readable by other processes as the same user | Run only when needed; 1Password approval on start |
+| Okta data sent to the model becomes part of the conversation | Use a dev or test org, not production data |
+| A confused or manipulated assistant could misuse its tools | Least-privilege scopes and role, human approval, Okta audit log |
 
 ## Setup
 
-1. Install the tools:
-   ```bash
-   brew install uv
-   brew install --cask 1password-cli
-   ```
-2. In the 1Password app, open **Settings → Developer** and turn on **Integrate with 1Password CLI**.
-3. In Okta, create an **API Services** app:
-   - Under client authentication, choose **Public key / Private key** and turn off DPoP.
-   - Grant Okta API scopes and assign an admin role.
-   - Download the key as PEM and note its Key ID.
-   - Optional but recommended: on the app's **General** tab, limit token requests to a network zone
-     that contains only your IP addresses.
-4. Store the PEM in 1Password: create a **Secure Note**, for example "Okta developer MCP key" in a
-   `dev` vault, paste the PEM into the note body, and delete the downloaded file.
-5. Run `cp env.example env` and fill in `env`.
-6. Register `run.sh` with Claude:
+1. Install the tools: `brew install uv` and `brew install --cask 1password-cli`. In 1Password,
+   turn on **Settings → Developer → Integrate with 1Password CLI**.
+2. In Okta, create an **API Services** app:
+   - client authentication **Public key / Private key** (DPoP off, since the server doesn't support it)
+   - grant only the scopes you'll list in `OKTA_SCOPES`
+   - assign a custom admin role with only the permissions those tools need
+   - under **General**, restrict token requests to a network zone with your IP addresses
+3. Save the PEM in a 1Password Secure Note, e.g. "Okta developer MCP key" in `dev`, then delete the
+   downloaded file.
+4. Run `cp env.example env`, fill it in, and run `git config core.hooksPath .githooks`.
+5. Register `run.sh` with Claude:
    - Claude Code: `claude mcp add --scope user okta -- "$PWD/run.sh"`
    - Claude Desktop: add the entry from `examples/claude-mcp-entry.json` to
      `~/Library/Application Support/Claude/claude_desktop_config.json`
-7. Turn on the commit safety check. It blocks any commit that includes `env` or a private key:
-   `git config core.hooksPath .githooks`
-8. Restart Claude. 1Password may ask you to approve access when the server starts.
+6. Restart Claude and approve the 1Password prompt when the server starts.
 
 ## Upgrading
 
-`run.sh` pins the server version (`okta-mcp-server@X.Y.Z`). It also pins a dependency cutoff
-(`--exclude-newer`), so packages published after that date are never used. To upgrade, change both:
-set the version to the new release and the cutoff to a date after that release. Then run `./run.sh`
-to test before you commit.
+`run.sh` pins both the server version (`okta-mcp-server@X.Y.Z`) and a dependency cutoff date
+(`--exclude-newer`). To upgrade, change both: the new version, and a cutoff after its release date.
+Run `./run.sh` to test before committing.
+
+## Related
+
+[okta-access-review](https://github.com/matt-spellcaster/okta-access-review) is a read-only CLI for
+periodic Okta access reviews, with SOC 2 and ISO 27001 control mapping and audit-ready evidence.
+It uses the same credential handling, plus DPoP.
