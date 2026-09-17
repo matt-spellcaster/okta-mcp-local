@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "okta": {
+      "command": "/Users/YOUR_USER/code/okta-mcp-local/run.sh",
+      "args": []
+    }
+  }
+}
