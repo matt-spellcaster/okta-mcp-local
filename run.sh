@@ -19,4 +19,6 @@ if ! OKTA_PRIVATE_KEY="$(/opt/homebrew/bin/op read "$OKTA_PRIVATE_KEY_REF")"; th
 fi
 export OKTA_PRIVATE_KEY
 unset OKTA_PRIVATE_KEY_REF
-exec /opt/homebrew/bin/uvx okta-mcp-server@1.1.6
+# Pin the server and freeze its dependencies to what was on PyPI at this
+# date, so upstream releases can't change what runs. Bump both together.
+exec /opt/homebrew/bin/uvx --exclude-newer 2026-09-16T00:00:00Z okta-mcp-server@1.1.6

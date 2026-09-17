@@ -29,3 +29,10 @@ The key never lives in this repo or on disk.
    - Claude Desktop: add the entry from `examples/claude-mcp-entry.json` to
      `~/Library/Application Support/Claude/claude_desktop_config.json`
 7. Restart Claude. 1Password may ask you to approve access when the server starts.
+
+## Upgrading
+
+`run.sh` pins the server version (`okta-mcp-server@X.Y.Z`). It also pins a dependency cutoff
+(`--exclude-newer`), so packages published after that date are never used. To upgrade, change both:
+set the version to the new release and the cutoff to a date after that release. Then run `./run.sh`
+to test before you commit.
