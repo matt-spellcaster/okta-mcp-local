@@ -30,8 +30,9 @@ This setup assumes the machine or the repo could be exposed, and it limits what 
 - **Scopes are listed explicitly.** Only the scopes in `OKTA_SCOPES` are requested, and each must
   be granted to the app in Okta. The server turns off every tool whose scope is missing, so Claude
   only sees the operations it is allowed to perform.
-- **Admin role.** What the app can do is limited by both its granted scopes and its admin role.
-  Assign the smallest role that works, ideally a custom role limited to a resource set.
+- **Least-privilege admin role.** What the app can do is limited by both its granted scopes and
+  its admin role. The app has a custom admin role that grants only the permissions these tools
+  need, instead of a built-in role like Super Admin.
 - **Network restriction.** The app accepts token requests, and use of its tokens, only from an
   allowlisted network zone. A stolen key or access token is useless from any other network.
 - **Human in the loop.** The server asks for confirmation before destructive operations, and Claude
