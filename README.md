@@ -34,7 +34,10 @@ This setup assumes the machine or the repo could be exposed, and it limits what 
   its admin role. The app has a custom admin role that grants only the permissions these tools
   need, instead of a built-in role like Super Admin.
 - **Network restriction.** The app accepts token requests, and use of its tokens, only from an
-  allowlisted network zone. A stolen key or access token is useless from any other network.
+  allowlisted network zone. A stolen key or access token is useless from any other network. This
+  was added mainly because the MCP server doesn't support DPoP, which would otherwise tie each
+  token to a client-held key. Without DPoP, the network restriction limits where a stolen token
+  can be used.
 - **Human in the loop.** The server asks for confirmation before destructive operations, and Claude
   asks for approval before calling tools unless you tell it to always allow them.
 
@@ -55,7 +58,7 @@ This setup assumes the machine or the repo could be exposed, and it limits what 
 ### Known limitations
 
 - **Tokens are bearer tokens.** The server doesn't support DPoP, so access tokens aren't tied to a
-  client key. The network restriction and Okta's short token lifetime reduce this risk.
+  client key. The network restriction (see above) and Okta's short token lifetime reduce this risk.
 - **The key is in memory while the server runs.** It is held in the server process's environment,
   where other processes running as the same macOS user could read it.
 - **Okta data goes to the model.** Anything Claude reads through these tools, such as user profiles
