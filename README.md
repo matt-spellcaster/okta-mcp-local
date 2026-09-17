@@ -10,8 +10,8 @@ restricted network, a pinned supply chain, and a human approving each action.
 
 - **No shared secret:** Private Key JWT, with the key kept in 1Password and fetched only when the
   server starts.
-- **Least privilege in two layers:** explicit API scopes, plus a custom admin role instead of
-  Super Administrator.
+- **Least privilege in two layers:** explicit API scopes, plus a custom admin role (and read-only
+  Report Administrator for logs) instead of Super Administrator.
 - **Stolen credentials don't work elsewhere:** tokens are only issued to, and accepted from, an
   allowlisted network.
 - **Pinned supply chain:** an exact server version, and dependencies frozen to a publish date.
@@ -35,7 +35,7 @@ listens on the network, and Claude's config contains only the path to `run.sh`.
 | Safeguard | Risk it addresses | SOC 2 | ISO 27001:2022 |
 |---|---|---|---|
 | Private Key JWT; key only in 1Password | Leaked client secret | CC6.1 | A.5.17 |
-| Explicit scopes and a custom admin role | Over-privileged assistant | CC6.3 | A.8.2 |
+| Explicit scopes; a custom admin role plus read-only Report Administrator | Over-privileged assistant | CC6.3 | A.8.2 |
 | Network zone on token requests and token use | Stolen key or token used elsewhere | CC6.6 | A.8.20 |
 | Pinned server and frozen dependencies | Malicious or breaking upstream release | CC8.1 | A.8.19 |
 | Pre-commit hook, `.gitignore`, push protection | Secrets committed to git | CC6.1 | A.8.12 |
@@ -59,7 +59,8 @@ The setup assumes the machine or repo could be exposed, and limits what a leak c
   [okta-access-review](https://github.com/matt-spellcaster/okta-access-review) tool reports
   service apps whose granted write scopes or admin roles go beyond that (check AR-10).
 - Okta allows a call only if both the token's scopes and the app's admin role permit it. The app
-  uses a custom role with only the permissions these tools need.
+  uses a custom role limited to users, groups and viewing apps. That role doesn't cover the system
+  log, so the app also has the built-in, view-only **Report Administrator** role for the log tools.
 - The server doesn't support DPoP, which would bind tokens to a client key. The network zone is the
   compensating control: a stolen key or token is useless outside the allowlisted network.
 
@@ -87,7 +88,9 @@ The setup assumes the machine or repo could be exposed, and limits what a leak c
      groups, apps, logs and policies, plus `okta.users.manage` and `okta.groups.manage`, which
      enables 28 of the server's 112 tools (in version 1.1.6). Branding, domain, template, device,
      app and policy changes stay off.
-   - assign a custom admin role with permissions for users and groups, plus viewing apps
+   - assign a custom admin role with permissions for users and groups, plus viewing apps, and the
+     built-in **Report Administrator** role. Without it, the log tools fail with
+     `E0000006 You do not have permission`, even though `okta.logs.read` is granted.
    - under **General**, restrict token requests to a network zone with your IP addresses
 3. Save the PEM in a 1Password Secure Note, e.g. "Okta developer MCP key" in `dev`, then delete the
    downloaded file.
