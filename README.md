@@ -29,10 +29,3 @@ The key never lives in this repo or on disk.
    - Claude Desktop: add the entry from `examples/claude-mcp-entry.json` to
      `~/Library/Application Support/Claude/claude_desktop_config.json`
 7. Restart Claude. 1Password may ask you to approve access when the server starts.
-
-## Troubleshooting
-
-- **"Connection closed" in Claude:** run `./run.sh` in a terminal to see the error.
-  - The org URL must not contain `-admin`.
-  - Every scope in `OKTA_SCOPES` must be granted to the app in Okta.
-- **Detailed logs:** uncomment `OKTA_LOG_LEVEL` / `OKTA_LOG_FILE` in `env`.
