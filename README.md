@@ -1,21 +1,14 @@
 # okta-mcp-local
 
-**Connecting an AI assistant to Okta, with the same controls as any other privileged integration.**
+A launcher for Okta's open source [okta-mcp-server](https://github.com/okta/okta-mcp-server), used
+with Claude Code and Claude Desktop on macOS. It sets up the assistant's Okta access the same way as
+any privileged service account.
 
-AI assistants that can call admin APIs are a new kind of privileged access, and auditors will ask
-how they're governed. This repo runs Okta's open source
-[okta-mcp-server](https://github.com/okta/okta-mcp-server) for Claude Code and Claude Desktop on
-macOS. It treats the assistant like a service account: no secret on disk, least-privilege access,
-restricted network, a pinned supply chain, and a human approving each action.
-
-- **No shared secret:** Private Key JWT, with the key kept in 1Password and fetched only when the
-  server starts.
-- **Least privilege in two layers:** explicit API scopes, plus a custom admin role (and read-only
-  Report Administrator for logs) instead of Super Administrator.
-- **Stolen credentials don't work elsewhere:** tokens are only issued to, and accepted from, an
-  allowlisted network.
-- **Pinned supply chain:** an exact server version, and dependencies frozen to a publish date.
-- **Leak prevention:** a pre-commit hook, git-ignored settings, and GitHub push protection.
+- Private Key JWT authentication. The key stays in 1Password and is fetched when the server starts.
+- Seven API scopes and a custom admin role, plus the view-only Report Administrator role for logs.
+- Tokens can only be requested and used from an allowlisted network.
+- The server version is pinned, and dependencies are frozen to a publish date.
+- A pre-commit hook and GitHub push protection block committed secrets.
 
 ## How it works
 
