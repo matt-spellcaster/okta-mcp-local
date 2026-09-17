@@ -83,8 +83,11 @@ The setup assumes the machine or repo could be exposed, and limits what a leak c
    turn on **Settings → Developer → Integrate with 1Password CLI**.
 2. In Okta, create an **API Services** app:
    - client authentication **Public key / Private key** (DPoP off, since the server doesn't support it)
-   - grant only the scopes you'll list in `OKTA_SCOPES`
-   - assign a custom admin role with only the permissions those tools need
+   - grant only the scopes you'll list in `OKTA_SCOPES`. The default set is read access to users,
+     groups, apps, logs and policies, plus `okta.users.manage` and `okta.groups.manage`, which
+     enables 28 of the server's 112 tools (in version 1.1.6). Branding, domain, template, device,
+     app and policy changes stay off.
+   - assign a custom admin role with permissions for users and groups, plus viewing apps
    - under **General**, restrict token requests to a network zone with your IP addresses
 3. Save the PEM in a 1Password Secure Note, e.g. "Okta developer MCP key" in `dev`, then delete the
    downloaded file.
