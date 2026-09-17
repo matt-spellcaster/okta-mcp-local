@@ -28,7 +28,9 @@ The key never lives in this repo or on disk.
    - Claude Code: `claude mcp add --scope user okta -- "$PWD/run.sh"`
    - Claude Desktop: add the entry from `examples/claude-mcp-entry.json` to
      `~/Library/Application Support/Claude/claude_desktop_config.json`
-7. Restart Claude. 1Password may ask you to approve access when the server starts.
+7. Turn on the commit safety check. It blocks any commit that includes `env` or a private key:
+   `git config core.hooksPath .githooks`
+8. Restart Claude. 1Password may ask you to approve access when the server starts.
 
 ## Upgrading
 
